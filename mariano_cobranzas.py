@@ -19,6 +19,7 @@ app = dash.Dash(
     title="Dashboard Ejecutivo de Cuentas Corrientes",
     suppress_callback_exceptions=True
 )
+server = app.server
 
 app.index_string = '''
 <!DOCTYPE html>

@@ -385,10 +385,15 @@ def procesar_login(n_clicks, usuario, password):
     if not password:
         return None, dbc.Alert("Por favor ingrese su contraseña.", color="danger", className="py-1 px-2 small")
     
-    if usuario in USUARIOS and USUARIOS[usuario] == str(password).strip():
+    usuario_clean = str(usuario).strip()
+    password_clean = str(password).strip()
+
+    if usuario_clean in USUARIOS and USUARIOS[usuario_clean] == password_clean:
         if error_carga and df_global.empty:
-            return None, dbc.Alert(f"Error cargando Excel: {error_carga}", color="danger", className="py-1 px-2 small")
-        return usuario, None
+            return None, dbc.Alert(f"Error al cargar datos del Excel: {error_carga}", color="danger", className="py-1 px-2 small")
+        return usuario_clean, None
+    else:
+        return None, dbc.Alert(f"Contraseña o usuario incorrecto para '{usuario_clean}'.", color="danger", className="py-1 px-2 small")
     else:
         return None, dbc.Alert("Contraseña o usuario incorrecto.", color="danger", className="py-1 px-2 small")
 

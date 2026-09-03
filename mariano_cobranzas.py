@@ -82,7 +82,7 @@ app.index_string = '''
 </html>
 '''
 
-CREDENCIALES_USUARIOS = {
+USUARIOS = {
     "Administrador": "admin123",
     "Claudio": "claudio2026",
     "Miguel": "miguel2026",

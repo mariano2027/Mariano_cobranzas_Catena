@@ -1,1 +1,1 @@
-web: python Mariano_cobranzas.py
+web: gunicorn mariano_cobranzas:server

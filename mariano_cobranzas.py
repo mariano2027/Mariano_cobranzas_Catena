@@ -179,13 +179,13 @@ def cargar_excel_automatico():
     else:
         df['Días de Atraso'] = 0
 
-    col_limite = next((c for c in df.columns if any(k in c.lower() for k in ['limite', 'crédito', 'credito'])) , None)
+    col_limite = next((c for c in df.columns if any(k in c.lower() for k in ['limite', 'crédito', 'credito'])), None)
     if col_limite:
         df['Limite Credito'] = clean_currency_series(df[col_limite])
     else:
         df['Limite Credito'] = 0.0
 
-    col_dias_calle = next((c for c in df.columns if any(k in c.lower() for k in ['dias en calle', 'días en calle', 'calle'])) , None)
+    col_dias_calle = next((c for c in df.columns if any(k in c.lower() for k in ['dias en calle', 'días en calle', 'calle'])), None)
     if col_dias_calle:
         df['Dias en Calle'] = pd.to_numeric(
             df[col_dias_calle].astype(str).str.replace(r'[^\d\.,-]', '', regex=True).str.replace(',', '.'),
@@ -208,6 +208,8 @@ try:
     datos_globales_dict = df_global.to_dict('records')
     error_carga = None
 except Exception as e:
+    df_global = pd.DataFrame()
+    nombre_archivo_encontrado = "Sin archivo"
     datos_globales_dict = []
     error_carga = str(e)
 
@@ -224,7 +226,7 @@ def crear_layout_login():
                         html.Label("Usuario:", className="fw-semibold text-light mb-2 text-start d-block"),
                         dcc.Dropdown(
                             id='login-usuario-select',
-                            options=[{'label': u, 'value': u} for u in CREDENCIALES_USUARIOS.keys()],
+                            options=[{'label': u, 'value': u} for u in USUARIOS.keys()],
                             placeholder="Seleccione usuario...",
                             style={'color': '#0f172a'}
                         ),
@@ -286,7 +288,7 @@ def crear_layout_dashboard(usuario_actual):
                 html.Div([
                     html.Div([
                         html.H1([html.I(className="bi bi-graph-up-arrow me-3 text-info"), "Dashboard Ejecutivo de Cuentas Corrientes"], className="fw-bold text-white mb-1 h2"),
-                        html.P(f"Archivo analizado: {nombre_archivo_encontrado if not error_carga else 'Error'} — Sesión Activa: {usuario_actual}", className="text-secondary mb-0 small")
+                        html.P(f"Archivo analizado: {nombre_archivo_encontrado if not error_carga else 'Error de Carga'} — Sesión Activa: {usuario_actual}", className="text-secondary mb-0 small")
                     ]),
                     dbc.Button([html.I(className="bi bi-box-arrow-left me-1"), "Cerrar Sesión"], id="btn-logout", color="outline-danger", size="sm")
                 ], className="py-3 px-2 d-flex justify-content-between align-items-center")
@@ -359,7 +361,7 @@ def crear_layout_dashboard(usuario_actual):
         ])
     ], fluid=True, className="p-3 p-md-4")
 
-# Layout principal que actúa como enrutador
+# Layout principal
 app.layout = html.Div([
     dcc.Store(id='auth-store', data=None),
     html.Div(id='page-content')
@@ -380,7 +382,7 @@ def procesar_login(n_clicks, usuario, password):
         if not password:
             return None, dbc.Alert("Por favor ingrese su contraseña.", color="danger", className="py-1 px-2 small")
         
-        if usuario in CREDENCIALES_USUARIOS and CREDENCIALES_USUARIOS[usuario] == password:
+        if usuario in USUARIOS and USUARIOS[usuario] == password:
             if error_carga:
                 return None, dbc.Alert(f"Error cargando Excel: {error_carga}", color="danger", className="py-1 px-2 small")
             return usuario, None
@@ -522,7 +524,7 @@ def render_tab_content(active_tab, records, usuario_sesion, vendedor_sel, locali
         fig_tramo.update_layout(plot_bgcolor='rgba(0,0,0,0)', paper_bgcolor='rgba(0,0,0,0)')
 
         df_vend_tramo = df.groupby(["Vendedor", "Tramo Morosidad"], as_index=False)["Saldo Deuda"].sum()
-        fig_vend = px.bar(df_vend_tramo, x="Saldo Deuda", y="Vendedor", color="Tramo Morosidad", orientation='h', title="Performance por Vendedor (Haga clic en una barra para filtrar)", template="plotly_dark")
+        fig_vend = px.bar(df_vend_tramo, x="Saldo Deuda", y="Vendedor", color="Tramo Morosidad", orientation='h', title="Performance por Vendedor", template="plotly_dark")
         fig_vend.update_layout(barmode='stack', plot_bgcolor='rgba(0,0,0,0)', paper_bgcolor='rgba(0,0,0,0)')
 
         return dbc.Row([
@@ -569,6 +571,7 @@ def render_tab_content(active_tab, records, usuario_sesion, vendedor_sel, locali
             dbc.Col([html.Div([dcc.Graph(figure=fig_mapa, style={"height": "500px"})], className="p-3 exec-card")], xs=12, lg=12, className="mb-3"),
             dbc.Col([html.Div([dcc.Graph(figure=fig_loc_bar, style={"height": "450px"})], className="p-3 exec-card")], xs=12, lg=12, className="mb-3")
         ])
+
     elif active_tab == "tab-top-clientes":
         df_top = df.groupby(["Cliente", "Razon Social", "Vendedor"], as_index=False)["Saldo Deuda"].sum().sort_values(by="Saldo Deuda", ascending=False).head(15)
         
@@ -662,13 +665,10 @@ def render_tab_content(active_tab, records, usuario_sesion, vendedor_sel, locali
                 rowData=df_din.to_dict("records"),
                 columnDefs=columnas_din,
                 className="ag-theme-alpine-dark",
-                style={"height": "400px", "width": "100%"},
-                columnSize="sizeToFit",
-                dashGridOptions={"pagination": True, "paginationPageSize": 10}
+                style={"height": "350px", "width": "100%"},
+                columnSize="sizeToFit"
             )
         ], className="p-3 exec-card")
 
 if __name__ == '__main__':
-    app.run(debug=True)
-    
-
+    app.run_server(debug=False)

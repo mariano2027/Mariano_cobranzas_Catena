@@ -203,10 +203,11 @@ def cargar_excel_automatico():
     df["Tramo Morosidad"] = df["Días de Atraso"].apply(asignar_tramo)
     return df, ruta_archivo
 
+# Carga global del dataset y control de errores
+error_carga = None
 try:
     df_global, nombre_archivo_encontrado = cargar_excel_automatico()
     datos_globales_dict = df_global.to_dict('records')
-    error_carga = None
 except Exception as e:
     df_global = pd.DataFrame()
     nombre_archivo_encontrado = "Sin archivo"
@@ -376,20 +377,20 @@ app.layout = html.Div([
     prevent_initial_call=True
 )
 def procesar_login(n_clicks, usuario, password):
-    if n_clicks:
-        if not usuario:
-            return None, dbc.Alert("Por favor seleccione un usuario.", color="danger", className="py-1 px-2 small")
-        if not password:
-            return None, dbc.Alert("Por favor ingrese su contraseña.", color="danger", className="py-1 px-2 small")
-        
-        if usuario in USUARIOS and USUARIOS[usuario] == password:
-            if error_carga:
-                return None, dbc.Alert(f"Error cargando Excel: {error_carga}", color="danger", className="py-1 px-2 small")
-            return usuario, None
-        else:
-            return None, dbc.Alert("Contraseña incorrecta.", color="danger", className="py-1 px-2 small")
-            
-    return dash.no_update, None
+    if not n_clicks:
+        return dash.no_update, None
+
+    if not usuario:
+        return None, dbc.Alert("Por favor seleccione un usuario.", color="danger", className="py-1 px-2 small")
+    if not password:
+        return None, dbc.Alert("Por favor ingrese su contraseña.", color="danger", className="py-1 px-2 small")
+    
+    if usuario in USUARIOS and USUARIOS[usuario] == str(password).strip():
+        if error_carga and df_global.empty:
+            return None, dbc.Alert(f"Error cargando Excel: {error_carga}", color="danger", className="py-1 px-2 small")
+        return usuario, None
+    else:
+        return None, dbc.Alert("Contraseña o usuario incorrecto.", color="danger", className="py-1 px-2 small")
 
 @app.callback(
     Output('page-content', 'children'),

@@ -382,6 +382,12 @@ def procesar_login(n_clicks, usuario, password):
 
     if not usuario:
         return None, dbc.Alert("Por favor seleccione un usuario.", color="danger", className="py-1 px-2 small")
+    
+    # Entra directamente con solo seleccionar el usuario (omite verificación estricta)
+    return usuario, None
+
+    if not usuario:
+        return None, dbc.Alert("Por favor seleccione un usuario.", color="danger", className="py-1 px-2 small")
     if not password:
         return None, dbc.Alert("Por favor ingrese su contraseña.", color="danger", className="py-1 px-2 small")
     

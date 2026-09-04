@@ -386,15 +386,15 @@ def procesar_login(n_clicks, usuario, password):
         return None, dbc.Alert("Por favor ingrese su contraseña.", color="danger", className="py-1 px-2 small")
     
     usuario_clean = str(usuario).strip()
-    password_clean = str(password).strip()
+    password_clean = str(password).strip().lower()
 
-   if usuario_clean in USUARIOS and USUARIOS[usuario_clean] == password_clean:
+    # Si la contraseña coincide con el usuario seleccionado
+    if usuario_clean in USUARIOS and USUARIOS[usuario_clean].lower() == password_clean:
         if error_carga and df_global.empty:
             return None, dbc.Alert(f"Error al cargar datos del Excel: {error_carga}", color="danger", className="py-1 px-2 small")
         return usuario_clean, None
     else:
-        return None, dbc.Alert(f"Contraseña o usuario incorrecto para '{usuario_clean}'.", color="danger", className="py-1 px-2 small")
-
+        return None, dbc.Alert("Contraseña o usuario incorrecto.", color="danger", className="py-1 px-2 small")
 @app.callback(
     Output('page-content', 'children'),
     Input('auth-store', 'data')

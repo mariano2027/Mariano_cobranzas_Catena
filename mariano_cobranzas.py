@@ -203,7 +203,6 @@ def cargar_excel_automatico():
     df["Tramo Morosidad"] = df["Días de Atraso"].apply(asignar_tramo)
     return df, ruta_archivo
 
-# Carga global del dataset y control de errores
 error_carga = None
 try:
     df_global, nombre_archivo_encontrado = cargar_excel_automatico()
@@ -348,6 +347,9 @@ def crear_layout_dashboard(usuario_actual):
             dbc.Col([
                 dbc.Row(id='kpi-cards-row', className="g-3 mb-4"),
 
+                # Barra informativa del cliente seleccionado
+                html.Div(id='cliente-info-bar', className="mb-4"),
+
                 dbc.Tabs(id="tabs-main", active_tab="tab-graficos", children=[
                     dbc.Tab(label="📊 Resumen General & Gráficos", tab_id="tab-graficos"),
                     dbc.Tab(label="🗺️ Mapa por Zonas", tab_id="tab-zonas"),
@@ -362,7 +364,6 @@ def crear_layout_dashboard(usuario_actual):
         ])
     ], fluid=True, className="p-3 p-md-4")
 
-# Layout principal
 app.layout = html.Div([
     dcc.Store(id='auth-store', data=None),
     html.Div(id='page-content')
@@ -382,25 +383,19 @@ def procesar_login(n_clicks, usuario, password):
 
     if not usuario:
         return None, dbc.Alert("Por favor seleccione un usuario.", color="danger", className="py-1 px-2 small")
-    
-    # Entra directamente con solo seleccionar el usuario (omite verificación estricta)
-    return usuario, None
-
-    if not usuario:
-        return None, dbc.Alert("Por favor seleccione un usuario.", color="danger", className="py-1 px-2 small")
     if not password:
         return None, dbc.Alert("Por favor ingrese su contraseña.", color="danger", className="py-1 px-2 small")
     
     usuario_clean = str(usuario).strip()
     password_clean = str(password).strip().lower()
 
-    # Si la contraseña coincide con el usuario seleccionado
     if usuario_clean in USUARIOS and USUARIOS[usuario_clean].lower() == password_clean:
         if error_carga and df_global.empty:
             return None, dbc.Alert(f"Error al cargar datos del Excel: {error_carga}", color="danger", className="py-1 px-2 small")
         return usuario_clean, None
     else:
         return None, dbc.Alert("Contraseña o usuario incorrecto.", color="danger", className="py-1 px-2 small")
+
 @app.callback(
     Output('page-content', 'children'),
     Input('auth-store', 'data')
@@ -452,16 +447,17 @@ def reset_filters(n_clicks, usuario_sesion):
 
 @app.callback(
     Output('kpi-cards-row', 'children'),
+    Output('cliente-info-bar', 'children'),
     Input('stored-data', 'data'),
     Input('session-usuario', 'data'),
     Input('vendedor-select', 'value'),
     Input('localidad-select', 'value'),
     Input('cliente-select', 'value')
 )
-def render_kpis(records, usuario_sesion, vendedor_sel, localidad_sel, cliente_sel):
+def render_kpis_y_barra_cliente(records, usuario_sesion, vendedor_sel, localidad_sel, cliente_sel):
     df = filtrar_dataframe(records, usuario_sesion, vendedor_sel, localidad_sel, cliente_sel)
     if df.empty:
-        return []
+        return [], None
 
     total_cartera = df["Saldo Deuda"].sum()
     df_critico = df[df["Días de Atraso"] > 75]
@@ -477,7 +473,7 @@ def render_kpis(records, usuario_sesion, vendedor_sel, localidad_sel, cliente_se
     else:
         atraso_ponderado = 0.0
 
-    return [
+    kpi_cards = [
         dbc.Col([
             html.Div([
                 html.Div([html.Span("Cartera Total Gestionada", className="kpi-title"), html.I(className="bi bi-wallet2 text-info fs-4")], className="d-flex justify-content-between align-items-center mb-2"),
@@ -512,6 +508,31 @@ def render_kpis(records, usuario_sesion, vendedor_sel, localidad_sel, cliente_se
             ], className="p-3 exec-card h-100")
         ], xs=12, md=3)
     ]
+
+    # Barra informativa condicional cuando se selecciona un cliente específico
+    cliente_info_bar = None
+    if cliente_sel and cliente_sel != 'TODOS':
+        df_cli = df[df["Cliente"].astype(str) == str(cliente_sel)]
+        if not df_cli.empty:
+            razon_social = df_cli["Razon Social"].iloc[0]
+            comprobantes_activos = len(df_cli)
+            limite_credito = df_cli["Limite Credito"].max() if "Limite Credito" in df_cli.columns else 0.0
+            dias_en_calle = df_cli["Dias en Calle"].mean() if "Dias en Calle" in df_cli.columns else 0.0
+
+            cliente_info_bar = html.Div([
+                html.Div([
+                    html.Div([
+                        html.Span(f"Cliente Seleccionado: [{cliente_sel}] {razon_social}", className="fw-bold text-white me-3"),
+                        html.Span(f"— Comprobantes activos: {comprobantes_activos}", className="text-secondary small")
+                    ], className="mb-2 mb-md-0"),
+                    html.Div([
+                        html.Span([html.I(className="bi bi-square-fill text-warning me-1"), f"Límite de Crédito: {format_currency_full(limite_credito)}"], className="text-light me-4 small fw-semibold"),
+                        html.Span([html.I(className="bi bi-circle-fill text-light me-1"), f"Días en Calle: {dias_en_calle:.1f} días"], className="text-light small fw-semibold")
+                    ], className="d-flex align-items-center")
+                ], className="p-3 exec-card d-flex flex-column flex-md-row justify-content-between align-items-center border border-info")
+            ])
+
+    return kpi_cards, cliente_info_bar
 
 @app.callback(
     Output('tab-content-area', 'children'),
@@ -664,10 +685,10 @@ def render_tab_content(active_tab, records, usuario_sesion, vendedor_sel, locali
         
         columnas_din = [
             {"field": "Tramo Morosidad", "headerName": "Tramo de Antigüedad", "sortable": True, "filter": True, "flex": 2},
-            {"field": "Cant Clientes", "headerName": "Clientes Únicos", "sortable": True, "filter": True, "flex": 1},
-            {"field": "Saldo Deuda", "headerName": "Deuda Total", "sortable": True, "filter": True, "type": "rightAligned", "valueFormatter": {"function": "d3.format('$,.2f')(params.value)"}, "flex": 1}
+            {"field": "Cant Clientes", "headerName": "Cantidad Clientes", "sortable": True, "filter": True, "flex": 1},
+            {"field": "Saldo Deuda", "headerName": "Saldo Total", "sortable": True, "filter": True, "type": "rightAligned", "valueFormatter": {"function": "d3.format('$,.2f')(params.value)"}, "flex": 1}
         ]
-        
+
         return html.Div([
             html.H5("📈 Dinámica de Cartera por Tramo de Morosidad", className="text-white mb-3"),
             dag.AgGrid(
@@ -675,10 +696,11 @@ def render_tab_content(active_tab, records, usuario_sesion, vendedor_sel, locali
                 rowData=df_din.to_dict("records"),
                 columnDefs=columnas_din,
                 className="ag-theme-alpine-dark",
-                style={"height": "350px", "width": "100%"},
-                columnSize="sizeToFit"
+                style={"height": "400px", "width": "100%"},
+                columnSize="sizeToFit",
+                dashGridOptions={"pagination": True, "paginationPageSize": 10}
             )
         ], className="p-3 exec-card")
 
 if __name__ == '__main__':
-    app.run_server(debug=False)
+    app.run(debug=True, port=8050)
